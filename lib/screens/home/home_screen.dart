@@ -8,6 +8,7 @@ import 'package:sunu_task/screens/home/tabs/dashboard_tab.dart';
 import 'package:sunu_task/screens/home/tabs/profile_tab.dart';
 import 'package:sunu_task/screens/home/tabs/projects_tab.dart';
 import 'package:sunu_task/screens/home/tabs/tasks_tab.dart';
+import 'package:sunu_task/screens/projects/project_form_screen.dart';
 
 /// Écran principal avec navigation par onglets
 class HomeScreen extends StatefulWidget {
@@ -199,7 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: _currentIndex <= 1
           ? FloatingActionButton(
         onPressed: () {
-          // On ajoutera la navigation vers ProjectFormScreen plus tard
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ProjectFormScreen(),
+            ),
+          );
         },
         child: Icon(Icons.add),
       )
