@@ -14,7 +14,7 @@ class AppStrings {
   static const String appName = 'SunuTask';
   static const String appSlogan = 'Gérez vos projets efficacement';
 
- // ============== Onboarding ==============
+  // ============== Onboarding ==============
 
   static const String onboardingTitle1 = 'Bienvenue sur $appName';
   static const String onboardingDesc1 =

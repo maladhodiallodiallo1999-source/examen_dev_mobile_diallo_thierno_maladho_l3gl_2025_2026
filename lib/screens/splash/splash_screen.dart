@@ -1,13 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:sunu_task/core/constants/app_strings.dart';
-import 'package:sunu_task/screens/home/home_screen.dart';
-import 'package:sunu_task/screens/onboarding/onboarding_screen.dart';
-import 'package:sunu_task/services/storage_service.dart';
-
-import '../../core/constants/app_colors.dart';
-import 'package:sunu_task/screens/auth/login_screen.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/core/constants/app_strings.dart';
+import 'package:SunuTask/screens/auth/login_screen.dart';
+import 'package:SunuTask/screens/onboarding/onboarding_screen.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,7 +18,6 @@ class _SplashScreenState extends State<SplashScreen> {
   bool _showLogo = false;
   bool _showText = false;
 
-  // === Cycle de vie =====
   @override
   void initState() {
     super.initState();
@@ -31,153 +27,97 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   void dispose() {
-    // Important: annuler le timer pour eviter les fuites de memoire
     _timer?.cancel();
     super.dispose();
   }
 
   void _startAnimations() {
-    Future.delayed(Duration(milliseconds: 100), () {
-      //mounted vérifie toujours si le widget est toujours actif
-      // dans l'arbre de widget
-      if(mounted) {
-        setState(() => _showLogo = true);
-      }
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _showLogo = true);
     });
-
-    Future.delayed(Duration(milliseconds: 1500), () {
-      if(mounted) {
-        setState(() => _showText = true);
-      }
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _showText = true);
     });
   }
 
   void _startTimer() {
-    _timer = Timer( Duration(seconds: 3), _navigateToNextScreen);
+    _timer = Timer(const Duration(seconds: 3), _navigateToNextScreen);
   }
 
   void _navigateToNextScreen() {
-    if(!mounted) return;
+    if (!mounted) return;
+
+    // ← MODIFIÉ : on va vers LoginScreen si onboarding fait,
+    // sinon vers OnboardingScreen
     final bool onboardingComplete = StorageService.instance.isOnboardingComplete;
 
     Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-            onboardingComplete
-                ? const LoginScreen()  // ← LoginScreen au lieu de HomeScreen
-                : const OnboardingScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
-            },
-            transitionDuration: Duration(milliseconds: 300)
-        )
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => onboardingComplete
+            ? const LoginScreen()
+            : const SimpleOnboardingScreen(),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // logo
-            _buildLogo(),
-            SizedBox(height: 24,),
-            // Nom App
-            _buildAppName(),
-            SizedBox(height: 8,),
-            // Slogan
-            _buildAppSlogan(),
-
-            SizedBox(height: 48,),
-            //Chargement
-            _buildLoadingIndicator()
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _buildLogo(),
+          const SizedBox(height: 24),
+          _buildAppName(),
+          const SizedBox(height: 8),
+          _buildAppSlogan(),
+          const SizedBox(height: 48),
+          _buildLoadingIndicator(),
+        ]),
       ),
     );
   }
 
   Widget _buildLogo() {
-    return AnimatedOpacity( // Rendu fondu : Démarrage Lent puis accéleration progressive
+    return AnimatedOpacity(
       opacity: _showLogo ? 1 : 0,
-      duration: Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 500),
       curve: Curves.easeIn,
-      child: AnimatedScale( // Démarrage rapide puis décélération
+      child: AnimatedScale(
         scale: _showLogo ? 1 : 0,
-        duration: Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeOut,
         child: Container(
-          width: 124,
-          height: 124,
+          width: 124, height: 124,
           decoration: BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withAlpha(180),
-                blurRadius: 20,
-                offset: Offset(0, 10)
-              )
-            ]
-            //shape: BoxShape.circle
+            boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(180), blurRadius: 20, offset: const Offset(0, 10))],
           ),
-          child: Icon(
-            Icons.task_alt,
-            size: 65,
-            color: AppColors.white.withAlpha(200),
-          ),
+          child: Icon(Icons.task_alt, size: 65, color: AppColors.white.withAlpha(200)),
         ),
       ),
     );
   }
 
-  Widget _buildAppName() {
-    return AnimatedOpacity(
-      opacity: _showText ? 1 : 0,
-      duration: Duration(milliseconds: 500),
-      child: Text(
-        AppStrings.appName,
-        style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          letterSpacing: 1.2
-        ),
-      ),
-    );
-  }
+  Widget _buildAppName() => AnimatedOpacity(
+    opacity: _showText ? 1 : 0,
+    duration: const Duration(milliseconds: 500),
+    child: const Text(AppStrings.appName, style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.2)),
+  );
 
-  Widget _buildAppSlogan() {
-    return AnimatedOpacity(
-      opacity: _showText ? 1 : 0,
-      duration: Duration(milliseconds: 500),
-      child: Text(
-        AppStrings.appSlogan,
-        style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary
-        ),
-      ),
-    );
-  }
+  Widget _buildAppSlogan() => AnimatedOpacity(
+    opacity: _showText ? 1 : 0,
+    duration: const Duration(milliseconds: 500),
+    child: const Text(AppStrings.appSlogan, style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+  );
 
-  Widget _buildLoadingIndicator() {
-    return AnimatedOpacity(
-      opacity: _showText ? 1 : 0,
-      duration: Duration(milliseconds: 500),
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 8.0,
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-        ),
-      ),
-    );
-  }
+  Widget _buildLoadingIndicator() => AnimatedOpacity(
+    opacity: _showText ? 1 : 0,
+    duration: const Duration(milliseconds: 500),
+    child: const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 8.0, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary))),
+  );
 }

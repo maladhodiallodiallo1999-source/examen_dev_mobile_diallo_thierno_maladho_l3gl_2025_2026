@@ -1,222 +1,106 @@
 import 'package:flutter/material.dart';
-import 'package:sunu_task/core/constants/app_colors.dart';
-import 'package:sunu_task/core/constants/app_strings.dart';
-import 'package:sunu_task/models/OnboardingItem.dart';
-import 'package:sunu_task/screens/auth/login_screen.dart';
-import 'package:sunu_task/services/storage_service.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/core/constants/app_strings.dart';
+import 'package:SunuTask/screens/auth/login_screen.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
-class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+class SimpleOnboardingScreen extends StatefulWidget {
+  const SimpleOnboardingScreen({Key? key}) : super(key: key);
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  State<SimpleOnboardingScreen> createState() => _SimpleOnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  late PageController _pageController;
-  int _currentPage = 0;
+class _SimpleOnboardingScreenState extends State<SimpleOnboardingScreen> {
+  late PageController pageController;
+  int pageIndex = 0;
 
-  final List<OnboardingItem> _pages = [
-    OnboardingItem(
-        icon: Icons.task_alt,
-        title: AppStrings.onboardingTitle1,
-        description: AppStrings.onboardingDesc1,
-        color: AppColors.primary
-    ),
-    OnboardingItem(
-      icon: Icons.people,
-      title: AppStrings.onboardingTitle2,
-      description: AppStrings.onboardingDesc2,
-      color: AppColors.secondary,
-    ),
-    OnboardingItem(
-      icon: Icons.calendar_today,
-      title: AppStrings.onboardingTitle3,
-      description: AppStrings.onboardingDesc3,
-      color: AppColors.warningLight,
-    ),
+  final List<List<String>> onboardingPages = [
+    [AppStrings.onboardingTitle1, AppStrings.onboardingDesc1],
+    [AppStrings.onboardingTitle2, AppStrings.onboardingDesc2],
+    [AppStrings.onboardingTitle3, AppStrings.onboardingDesc3],
   ];
 
-  //====== Cycle de vie =========
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    pageController = PageController();
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    pageController.dispose();
     super.dispose();
   }
 
-  //====== Methodes ========
-  void _nextPage() {
-    if(_currentPage < _pages.length - 1){
-      _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut);
-    }else {
-      _completeOnboarding();
-    }
+  /// ← MODIFIÉ : marque l'onboarding et va au LoginScreen
+  Future<void> _onGetStarted() async {
+    await StorageService.instance.setOnboardingComplete();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
-  Future<void> _completeOnboarding() async {
-    await StorageService.instance.setOnboardingComplete(true);
-
-    if(mounted){
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()) // ← LoginScreen
-      );
-    }
-  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildSkipButton(),
-
-            _buildPages(),
-
-            _buildNavigationButtons()
-          ],
-        )
-      )
-    );
-  }
-
-  Widget _buildSkipButton() {
-    if(_currentPage != _pages.length -1) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: TextButton(
-            onPressed: _completeOnboarding,
-            child: Text(
-                AppStrings.skip,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textSecondary,
-                )
-            )
+      backgroundColor: AppColors.background,
+      body: Column(children: [
+        Expanded(
+          child: PageView(
+            controller: pageController,
+            onPageChanged: (index) => setState(() => pageIndex = index),
+            children: onboardingPages.map((page) => buildPage(title: page[0], description: page[1])).toList(),
+          ),
         ),
-      );
-    }
 
-    return SizedBox();
-  }
-
-  Widget _buildPages() {
-    return Expanded(
-      child: PageView.builder(
-        controller: _pageController,
-        itemCount: _pages.length,
-        onPageChanged: (index) {
-          setState(() => _currentPage = index);
-        },
-        itemBuilder: (context, index){
-          return _buildPage(_pages[index]);
-        },
-      ),
-    );
-  }
-
-  Widget _buildPage(OnboardingItem item) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 160,
-            height: 160,
+        // Indicateurs de page
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(onboardingPages.length, (i) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            width: pageIndex == i ? 16 : 8,
+            height: 8,
             decoration: BoxDecoration(
-                color: item.color.withAlpha(100),
-                shape: BoxShape.circle,
-              //shape: BoxShape.circle
+              color: pageIndex == i ? AppColors.primary : AppColors.border,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(
-              item.icon,
-              size: 80,
-              color: item.color,
-            ),
+          )),
+        ),
+        const SizedBox(height: 24),
+
+        // Bouton Suivant / Commencer
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: ElevatedButton(
+            onPressed: () {
+              if (pageIndex < onboardingPages.length - 1) {
+                pageController.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+              } else {
+                _onGetStarted(); // ← va au LoginScreen
+              }
+            },
+            child: Text(pageIndex == onboardingPages.length - 1 ? AppStrings.getStarted : AppStrings.next),
           ),
-
-          SizedBox(height: 48,),
-
-          Text(
-            item.title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-            ),
-          ),
-
-          SizedBox(height: 16,),
-
-          Text(
-            item.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 16,
-                height: 1.5,
-                color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 
-  Widget _buildNavigationButtons() {
-    final isLastPage = _currentPage == _pages.length - 1;
-
+  Widget buildPage({required String title, required String description}) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Previous button - visible when not on first page
-          Visibility(
-              visible: _currentPage > 0,
-              child: TextButton(
-                  onPressed: () {
-                    _pageController.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut
-                    );
-                  },
-                  child: Text(
-                      AppStrings.previous,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      )
-                  )
-              )
-          ),
-
-          ElevatedButton(
-              onPressed: _nextPage,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              ),
-              child: Text(
-                  isLastPage ? AppStrings.getStarted : AppStrings.next,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                  )
-              )
-          ),
-        ],
+      padding: const EdgeInsets.all(28),
+      child: Container(
+        padding: const EdgeInsets.all(26),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(24)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          const SizedBox(height: 14),
+          Text(description, style: const TextStyle(fontSize: 16, height: 1.5, color: AppColors.textSecondary)),
+        ]),
       ),
     );
   }
-
 }

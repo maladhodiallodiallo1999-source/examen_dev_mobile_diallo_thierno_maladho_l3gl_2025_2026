@@ -1,75 +1,55 @@
-import 'package:flutter/material.dart';
-import 'package:sunu_task/models/project.dart';
-import 'package:sunu_task/services/storage_service.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
+import 'package:SunuTask/models/project.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
-/// Gère la collection de projets de l'utilisateur
+/// Gère la liste des projets de l'utilisateur
 class ProjectProvider extends ChangeNotifier {
-
-  // ======== Propriétés privées =========
   List<Project> _projects = [];
   Project? _selectedProject;
   bool _isLoading = false;
 
-  // ======== Getters publics =========
   List<Project> get projects => _projects;
   Project? get selectedProject => _selectedProject;
   int get projectCount => _projects.length;
   bool get isLoading => _isLoading;
-
-  // ======== Méthodes =========
 
   /// Charge les projets d'un utilisateur
   Future<void> loadProjects(String userId) async {
     _isLoading = true;
     notifyListeners();
 
-    _projects = StorageService.instance.getProjects(userId);
+    _projects = await StorageService.instance.getProjectsByUserId(userId);
 
     _isLoading = false;
     notifyListeners();
   }
 
-  /// Créer un nouveau projet
-  Future<void> createProject(String userId, String name,
-      String? description, int color) async {
-    final Project project = Project(
-      id: const Uuid().v4(),
-      name: name,
-      description: description,
-      userId: userId,
-      color: color,
-    );
-
+  /// Crée un nouveau projet
+  Future<void> createProject(Project project) async {
     await StorageService.instance.saveProject(project);
     _projects.add(project);
     notifyListeners();
   }
 
-  /// Modifier un projet existant
+  /// Modifie un projet existant
   Future<void> updateProject(Project project) async {
     await StorageService.instance.saveProject(project);
-
-    // Remplace l'ancien projet dans la liste
-    final int index = _projects.indexWhere((p) => p.id == project.id);
-    if (index >= 0) {
+    final index = _projects.indexWhere((p) => p.id == project.id);
+    if (index != -1) {
       _projects[index] = project;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
-  /// Supprimer un projet et toutes ses tâches
+  /// Supprime un projet (et ses tâches)
   Future<void> deleteProject(String projectId) async {
-    // Supprimer le projet
     await StorageService.instance.deleteProject(projectId);
-    // Supprimer toutes les tâches du projet
-    await StorageService.instance.deleteTasksByProject(projectId);
-    // Retirer de la liste locale
+    await StorageService.instance.deleteTasksByProjectId(projectId);
     _projects.removeWhere((p) => p.id == projectId);
     notifyListeners();
   }
 
-  /// Sélectionner un projet (pour la navigation)
+  /// Sélectionne un projet pour la navigation
   void selectProject(Project? project) {
     _selectedProject = project;
     notifyListeners();

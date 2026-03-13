@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sunu_task/core/theme/app_theme.dart';
-import 'package:sunu_task/providers/app_provider.dart';
-import 'package:sunu_task/providers/auth_provider.dart';
-import 'package:sunu_task/providers/project_provider.dart';
-import 'package:sunu_task/providers/task_provider.dart';
-import 'package:sunu_task/screens/splash/splash_screen.dart';
-import 'package:sunu_task/services/storage_service.dart';
+import 'package:SunuTask/core/theme/app_theme.dart';
+import 'package:SunuTask/providers/app_provider.dart';
+import 'package:SunuTask/providers/auth_provider.dart';
+import 'package:SunuTask/providers/project_provider.dart';
+import 'package:SunuTask/providers/task_provider.dart';
+import 'package:SunuTask/screens/splash/splash_screen.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +21,8 @@ class SunuTask extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppProvider()..init()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProjectProvider()),
         ChangeNotifierProvider(create: (_) => TaskProvider()),
       ],
@@ -32,7 +32,7 @@ class SunuTask extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,
-        home: SplashScreen(),
+        home: const SplashScreen(),
       ),
     );
   }

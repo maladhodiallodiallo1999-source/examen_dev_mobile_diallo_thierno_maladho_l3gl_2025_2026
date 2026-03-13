@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sunu_task/models/task.dart';
-import 'package:sunu_task/providers/auth_provider.dart';
-import 'package:sunu_task/providers/task_provider.dart';
-import 'package:sunu_task/widgets/common/custom_button.dart';
-import 'package:sunu_task/widgets/common/custom_text_field.dart';
+import 'package:uuid/uuid.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/models/task.dart';
+import 'package:SunuTask/providers/auth_provider.dart';
+import 'package:SunuTask/providers/task_provider.dart';
+import 'package:SunuTask/widgets/common/custom_button.dart';
+import 'package:SunuTask/widgets/common/custom_text_field.dart';
 
-/// Écran de création et modification de tâche
 class TaskFormScreen extends StatefulWidget {
-  // null = création, non-null = modification
   final Task? task;
-  // ID du projet auquel appartient la tâche
   final String? projectId;
-
   const TaskFormScreen({super.key, this.task, this.projectId});
 
   @override
@@ -23,26 +21,21 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-
-  // Statut sélectionné (À faire par défaut)
-  TaskStatus _selectedStatus = TaskStatus.todo;
-
-  // Priorité sélectionnée (Moyenne par défaut)
-  TaskPriority _selectedPriority = TaskPriority.medium;
-
-  // Date d'échéance sélectionnée
-  DateTime? _selectedDueDate;
+  TaskStatus _status = TaskStatus.todo;
+  TaskPriority _priority = TaskPriority.medium;
+  DateTime? _dueDate;
+  bool _isLoading = false;
+  bool get _isEditing => widget.task != null;
 
   @override
   void initState() {
     super.initState();
-    // Si modification → pré-remplir les champs
-    if (widget.task != null) {
+    if (_isEditing) {
       _titleController.text = widget.task!.title;
-      _descriptionController.text = widget.task!.description ?? '';
-      _selectedStatus = widget.task!.status;
-      _selectedPriority = widget.task!.priority;
-      _selectedDueDate = widget.task!.dueDate;
+      _descriptionController.text = widget.task!.description;
+      _status = widget.task!.status;
+      _priority = widget.task!.priority;
+      _dueDate = widget.task!.dueDate;
     }
   }
 
@@ -53,347 +46,170 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.dispose();
   }
 
-  /// Ouvre le sélecteur de date
-  Future<void> _selectDueDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() => _selectedDueDate = picked);
-    }
-  }
-
-  /// Sauvegarde la tâche
-  Future<void> _saveTask() async {
+  Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
-    final authProvider = context.read<AuthProvider>();
-    final taskProvider = context.read<TaskProvider>();
+    final provider = context.read<TaskProvider>();
+    final userId = context.read<AuthProvider>().currentUser!.id;
 
-    if (widget.task == null) {
-      // Création
-      await taskProvider.createTask(
-        projectId: widget.projectId!,
-        userId: authProvider.currentUser!.id,
+    if (_isEditing) {
+      await provider.updateTask(widget.task!.copyWith(
         title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        status: _selectedStatus,
-        priority: _selectedPriority,
-        dueDate: _selectedDueDate,
-      );
+        description: _descriptionController.text.trim(),
+        status: _status, priority: _priority, dueDate: _dueDate,
+      ));
     } else {
-      // Modification
-      final Task updatedTask = widget.task!.copyWith(
+      await provider.createTask(Task(
+        id: const Uuid().v4(),
         title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        status: _selectedStatus,
-        priority: _selectedPriority,
-        dueDate: _selectedDueDate,
-      );
-      await taskProvider.updateTask(updatedTask);
+        description: _descriptionController.text.trim(),
+        status: _status, priority: _priority,
+        projectId: widget.projectId!,
+        userId: userId,
+        dueDate: _dueDate,
+      ));
     }
 
-    if (mounted) Navigator.pop(context);
+    setState(() => _isLoading = false);
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
-  /// Supprime la tâche avec confirmation
-  Future<void> _deleteTask() async {
-    final bool? confirm = await showDialog<bool>(
+  Future<void> _handleDelete() async {
+    final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Supprimer la tâche'),
-        content: Text('Voulez-vous vraiment supprimer cette tâche ?'),
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer la tâche ?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Supprimer',
-                style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer', style: TextStyle(color: AppColors.error))),
         ],
       ),
     );
-
     if (confirm == true && mounted) {
       await context.read<TaskProvider>().deleteTask(widget.task!.id);
       Navigator.pop(context);
     }
   }
 
+  Widget _buildSelector<T>({required String label, required List<T> values, required T selected, required String Function(T) getLabel, required Color Function(T) getColor, required void Function(T) onSelect}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+      const SizedBox(height: 8),
+      Row(children: values.map((v) {
+        final isSelected = selected == v;
+        final color = getColor(v);
+        return Expanded(child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            child: GestureDetector(
+              onTap: () => setState(() => onSelect(v)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? color : color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color),
+                ),
+                child: Center(child: Text(getLabel(v), style: TextStyle(color: isSelected ? Colors.white : color, fontSize: 12, fontWeight: FontWeight.w600))),
+              ),
+            ),
+          ),
+        ));
+      }).toList()),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool isEditing = widget.task != null;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Modifier la tâche' : 'Nouvelle tâche'),
+        title: Text(_isEditing ? 'Modifier la tâche' : 'Nouvelle tâche'),
         actions: [
-          // Bouton supprimer visible uniquement en mode modification
-          if (isEditing)
-            IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: _deleteTask,
-            ),
+          if (_isEditing) IconButton(icon: const Icon(Icons.delete_outlined, color: AppColors.error), onPressed: _handleDelete),
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Champ Titre
-              CustomTextField(
-                label: 'Titre',
-                hint: 'Ex: Créer la maquette',
-                controller: _titleController,
-                prefixIcon: Icons.title,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un titre';
-                  }
-                  return null;
-                },
-              ),
-
-              SizedBox(height: 16),
-
-              // Champ Description
-              CustomTextField(
-                label: 'Description (optionnel)',
-                hint: 'Décrivez la tâche...',
-                controller: _descriptionController,
-                maxLines: 3,
-              ),
-
-              SizedBox(height: 24),
-
-              // Sélecteur de statut
-              Text(
-                'Statut',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatusSelector(
-                      label: 'À faire',
-                      status: TaskStatus.todo,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatusSelector(
-                      label: 'En cours',
-                      status: TaskStatus.inProgress,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatusSelector(
-                      label: 'Terminée',
-                      status: TaskStatus.done,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 24),
-
-              // Sélecteur de priorité
-              Text(
-                'Priorité',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPrioritySelector(
-                      label: 'Haute',
-                      priority: TaskPriority.high,
-                      color: Colors.red,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildPrioritySelector(
-                      label: 'Moyenne',
-                      priority: TaskPriority.medium,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildPrioritySelector(
-                      label: 'Basse',
-                      priority: TaskPriority.low,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 24),
-
-              // Sélecteur de date d'échéance
-              Text(
-                'Date d\'échéance (optionnel)',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              SizedBox(height: 12),
-
-              GestureDetector(
-                onTap: _selectDueDate,
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey.shade50,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_today,
-                          color: Colors.grey.shade600),
-                      SizedBox(width: 12),
-                      Text(
-                        _selectedDueDate == null
-                            ? 'Sélectionner une date'
-                            : '${_selectedDueDate!.day.toString().padLeft(2, '0')}/'
-                            '${_selectedDueDate!.month.toString().padLeft(2, '0')}/'
-                            '${_selectedDueDate!.year}',
-                        style: TextStyle(
-                          color: _selectedDueDate == null
-                              ? Colors.grey.shade500
-                              : Colors.black,
-                        ),
-                      ),
-                      Spacer(),
-                      // Bouton pour effacer la date
-                      if (_selectedDueDate != null)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedDueDate = null);
-                          },
-                          child: Icon(Icons.close,
-                              size: 18, color: Colors.grey),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 32),
-
-              // Bouton Créer/Modifier
-              Consumer<TaskProvider>(
-                builder: (context, provider, child) {
-                  return CustomButton(
-                    text: isEditing ? 'Modifier' : 'Créer la tâche',
-                    icon: isEditing ? Icons.save : Icons.add,
-                    isLoading: provider.isLoading,
-                    onPressed: _saveTask,
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Conteneur animé pour le statut
-  Widget _buildStatusSelector({
-    required String label,
-    required TaskStatus status,
-    required Color color,
-  }) {
-    final bool isSelected = _selectedStatus == status;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedStatus = status),
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withAlpha(20),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? color : color.withAlpha(80),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : color,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CustomTextField(
+              label: 'Titre',
+              controller: _titleController,
+              validator: (v) => (v == null || v.isEmpty) ? 'Titre obligatoire' : null,
             ),
-          ),
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 16),
+            CustomTextField(label: 'Description', controller: _descriptionController, maxLines: 3),
+            const SizedBox(height: 24),
 
-  /// Conteneur animé pour la priorité
-  Widget _buildPrioritySelector({
-    required String label,
-    required TaskPriority priority,
-    required Color color,
-  }) {
-    final bool isSelected = _selectedPriority == priority;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPriority = priority),
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withAlpha(20),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? color : color.withAlpha(80),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : color,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+            // Sélecteur de statut
+            _buildSelector<TaskStatus>(
+              label: 'Statut',
+              values: TaskStatus.values,
+              selected: _status,
+              getLabel: (s) => s == TaskStatus.todo ? 'À faire' : s == TaskStatus.inProgress ? 'En cours' : 'Terminée',
+              getColor: (s) => s == TaskStatus.todo ? AppColors.statusTodo : s == TaskStatus.inProgress ? AppColors.statusInProgress : AppColors.statusDone,
+              onSelect: (s) => _status = s,
             ),
-          ),
+            const SizedBox(height: 16),
+
+            // Sélecteur de priorité
+            _buildSelector<TaskPriority>(
+              label: 'Priorité',
+              values: TaskPriority.values,
+              selected: _priority,
+              getLabel: (p) => p == TaskPriority.high ? 'Haute' : p == TaskPriority.medium ? 'Moyenne' : 'Basse',
+              getColor: (p) => p == TaskPriority.high ? AppColors.priorityHigh : p == TaskPriority.medium ? AppColors.priorityMedium : AppColors.priorityLow,
+              onSelect: (p) => _priority = p,
+            ),
+            const SizedBox(height: 16),
+
+            // Date d'échéance
+            const Text("Date d'échéance", style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _dueDate ?? DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                );
+                if (date != null) setState(() => _dueDate = date);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 12),
+                  Text(
+                    _dueDate == null ? 'Choisir une date' : '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year}',
+                    style: TextStyle(color: _dueDate == null ? AppColors.textDisable : AppColors.textPrimary),
+                  ),
+                  const Spacer(),
+                  if (_dueDate != null) GestureDetector(
+                    onTap: () => setState(() => _dueDate = null),
+                    child: const Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            CustomButton(
+              text: _isEditing ? 'Modifier' : 'Créer la tâche',
+              onPressed: _isLoading ? null : _handleSubmit,
+              isLoading: _isLoading,
+            ),
+          ]),
         ),
       ),
     );

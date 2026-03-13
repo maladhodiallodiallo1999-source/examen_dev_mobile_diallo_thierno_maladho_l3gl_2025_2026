@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sunu_task/models/project.dart';
-import 'package:sunu_task/providers/auth_provider.dart';
-import 'package:sunu_task/providers/project_provider.dart';
-import 'package:sunu_task/widgets/common/custom_button.dart';
-import 'package:sunu_task/widgets/common/custom_text_field.dart';
+import 'package:uuid/uuid.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/models/project.dart';
+import 'package:SunuTask/providers/auth_provider.dart';
+import 'package:SunuTask/providers/project_provider.dart';
+import 'package:SunuTask/widgets/common/custom_button.dart';
+import 'package:SunuTask/widgets/common/custom_text_field.dart';
+import 'package:SunuTask/widgets/cards/project_card.dart';
 
-/// Écran de création et modification de projet
 class ProjectFormScreen extends StatefulWidget {
-  // null = création, non-null = modification
-  final Project? project;
-
+  final Project? project; // null = création, non-null = modification
   const ProjectFormScreen({super.key, this.project});
 
   @override
@@ -18,40 +18,26 @@ class ProjectFormScreen extends StatefulWidget {
 }
 
 class _ProjectFormScreenState extends State<ProjectFormScreen> {
-  // Clé du formulaire pour la validation
   final _formKey = GlobalKey<FormState>();
-
-  // Controllers pour lire les valeurs saisies
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  // Couleurs prédéfinies pour le projet
-  final List<Color> _colors = [
-    Colors.blue,
-    Colors.red,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.indigo,
+  final List<String> _colors = [
+    '0xFF0293ED', '0xFF4CAF50', '0xFFE91E63', '0xFFFF5722',
+    '0xFF9C27B0', '0xFF009688', '0xFFFF9800', '0xFF607D8B',
   ];
 
-  // Couleur sélectionnée (bleu par défaut)
-  late Color _selectedColor;
+  String _selectedColor = '0xFF0293ED';
+  bool _isLoading = false;
+  bool get _isEditing => widget.project != null;
 
   @override
   void initState() {
     super.initState();
-
-    // Si modification → pré-remplir les champs
-    if (widget.project != null) {
+    if (_isEditing) {
       _nameController.text = widget.project!.name;
-      _descriptionController.text = widget.project!.description ?? '';
-      _selectedColor = Color(widget.project!.color);
-    } else {
-      // Création → couleur par défaut
-      _selectedColor = _colors[0];
+      _descriptionController.text = widget.project!.description;
+      _selectedColor = widget.project!.color;
     }
   }
 
@@ -62,230 +48,104 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     super.dispose();
   }
 
-  /// Sauvegarde le projet (création ou modification)
-  Future<void> _saveProject() async {
-    // 1. Valider le formulaire
+  Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
-    final authProvider = context.read<AuthProvider>();
-    final projectProvider = context.read<ProjectProvider>();
+    final userId = context.read<AuthProvider>().currentUser!.id;
+    final provider = context.read<ProjectProvider>();
 
-    if (widget.project == null) {
-      // 2. Création d'un nouveau projet
-      await projectProvider.createProject(
-        authProvider.currentUser!.id,
-        _nameController.text.trim(),
-        _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        _selectedColor.value,
-      );
-    } else {
-      // 3. Modification du projet existant
-      final Project updatedProject = widget.project!.copyWith(
+    if (_isEditing) {
+      await provider.updateProject(widget.project!.copyWith(
         name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        color: _selectedColor.value,
-      );
-      await projectProvider.updateProject(updatedProject);
+        description: _descriptionController.text.trim(),
+        color: _selectedColor,
+      ));
+    } else {
+      await provider.createProject(Project(
+        id: const Uuid().v4(),
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        color: _selectedColor,
+        userId: userId,
+      ));
     }
 
-    // 4. Retourner à l'écran précédent
-    if (mounted) Navigator.pop(context);
+    setState(() => _isLoading = false);
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Détermine si on est en mode création ou modification
-    final bool isEditing = widget.project != null;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Modifier le projet' : 'Nouveau projet'),
-      ),
+      appBar: AppBar(title: Text(_isEditing ? 'Modifier le projet' : 'Nouveau projet')),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Champ Nom du projet
-              CustomTextField(
-                label: 'Nom du projet',
-                hint: 'Ex: Application Mobile',
-                controller: _nameController,
-                prefixIcon: Icons.folder,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un nom';
-                  }
-                  if (value.length < 3) {
-                    return 'Minimum 3 caractères';
-                  }
-                  return null;
-                },
-              ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CustomTextField(
+              label: 'Nom du projet',
+              controller: _nameController,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Nom obligatoire';
+                if (v.trim().length < 3) return 'Minimum 3 caractères';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(label: 'Description (optionnel)', controller: _descriptionController, maxLines: 3),
+            const SizedBox(height: 24),
 
-              SizedBox(height: 16),
-
-              // Champ Description
-              CustomTextField(
-                label: 'Description (optionnel)',
-                hint: 'Décrivez votre projet...',
-                controller: _descriptionController,
-                maxLines: 3,
-              ),
-
-              SizedBox(height: 24),
-
-              // Sélecteur de couleur
-              Text(
-                'Couleur du projet',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              SizedBox(height: 12),
-
-              // 8 cercles de couleurs
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _colors.map((color) {
-                  final bool isSelected = _selectedColor == color;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedColor = color);
-                    },
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        // Bordure blanche si sélectionné
-                        border: isSelected
-                            ? Border.all(color: Colors.white, width: 3)
-                            : null,
-                        // Ombre si sélectionné
-                        boxShadow: isSelected
-                            ? [
-                          BoxShadow(
-                            color: color.withAlpha(150),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          )
-                        ]
-                            : null,
-                      ),
-                      // Icône de validation si sélectionné
-                      child: isSelected
-                          ? Icon(Icons.check, color: Colors.white, size: 20)
-                          : null,
+            // Sélecteur de couleur
+            const Text('Couleur du projet', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12, runSpacing: 12,
+              children: _colors.map((hex) {
+                final isSelected = _selectedColor == hex;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = hex),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: Color(int.parse(hex)),
+                      shape: BoxShape.circle,
+                      border: isSelected ? Border.all(color: AppColors.textPrimary, width: 3) : null,
+                      boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(hex)).withOpacity(0.5), blurRadius: 8)] : null,
                     ),
-                  );
-                }).toList(),
-              ),
+                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 28),
 
-              SizedBox(height: 24),
-
-              // Aperçu en temps réel
-              Text(
-                'Aperçu',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+            // Aperçu en temps réel
+            const Text('Aperçu', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: Listenable.merge([_nameController, _descriptionController]),
+              builder: (_, __) => ProjectCard(
+                project: Project(
+                  id: 'preview',
+                  name: _nameController.text.isEmpty ? 'Nom du projet' : _nameController.text,
+                  description: _descriptionController.text,
+                  color: _selectedColor,
+                  userId: '',
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
 
-              SizedBox(height: 12),
-
-              // Aperçu de la carte projet
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _selectedColor.withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _selectedColor.withAlpha(80)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: _selectedColor.withAlpha(40),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.folder,
-                          color: _selectedColor, size: 24),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Nom en temps réel
-                          ListenableBuilder(
-                            listenable: _nameController,
-                            builder: (context, _) {
-                              return Text(
-                                _nameController.text.isEmpty
-                                    ? 'Nom du projet'
-                                    : _nameController.text,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: _nameController.text.isEmpty
-                                      ? Colors.grey
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                          // Description en temps réel
-                          ListenableBuilder(
-                            listenable: _descriptionController,
-                            builder: (context, _) {
-                              return Text(
-                                _descriptionController.text.isEmpty
-                                    ? 'Description...'
-                                    : _descriptionController.text,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 32),
-
-              // Bouton Créer/Modifier
-              Consumer<ProjectProvider>(
-                builder: (context, provider, child) {
-                  return CustomButton(
-                    text: isEditing ? 'Modifier' : 'Créer le projet',
-                    icon: isEditing ? Icons.save : Icons.add,
-                    isLoading: provider.isLoading,
-                    onPressed: _saveProject,
-                  );
-                },
-              ),
-            ],
-          ),
+            CustomButton(
+              text: _isEditing ? 'Modifier' : 'Créer le projet',
+              onPressed: _isLoading ? null : _handleSubmit,
+              isLoading: _isLoading,
+            ),
+          ]),
         ),
       ),
     );

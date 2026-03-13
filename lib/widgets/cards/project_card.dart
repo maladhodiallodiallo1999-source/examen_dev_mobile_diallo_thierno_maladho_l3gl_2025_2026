@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:sunu_task/models/project.dart';
+import 'package:SunuTask/models/project.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
 
-/// Carte affichant les informations d'un projet
+/// Carte affichant un projet dans la liste
 class ProjectCard extends StatelessWidget {
-  // Le projet à afficher
   final Project project;
-
-  // Nombre de tâches du projet
   final int taskCount;
-
-  // Action quand on tape sur la carte (navigation vers le détail)
   final VoidCallback? onTap;
-
-  // Action quand on veut modifier le projet
   final VoidCallback? onEdit;
-
-  // Action quand on veut supprimer le projet
   final VoidCallback? onDelete;
 
   const ProjectCard({
@@ -29,130 +21,80 @@ class ProjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Récupère la couleur du projet depuis sa valeur entière
-    final Color projectColor = Color(project.color);
+    final color = Color(int.parse(project.color));
 
     return Card(
-      // Ombre légère sous la carte
       elevation: 2,
-      // Coins arrondis
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: AppColors.surface,
       child: InkWell(
-        // InkWell ajoute l'effet de vague au tap
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Pastille de couleur du projet
+              // Pastille de couleur
               Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  // Couleur du projet avec transparence
-                  color: projectColor.withAlpha(40),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.folder,
-                  color: projectColor,
-                  size: 24,
-                ),
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
+              const SizedBox(width: 12),
 
-              SizedBox(width: 16),
-
-              // Nom et description du projet
+              // Nom, description, compteur tâches
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Nom du projet
                     Text(
                       project.name,
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.textPrimary,
                       ),
-                      // Coupe le texte si trop long
-                      overflow: TextOverflow.ellipsis,
                     ),
-
-                    // Description (si elle existe)
-                    if (project.description != null &&
-                        project.description!.isNotEmpty) ...[
-                      SizedBox(height: 4),
+                    if (project.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Text(
-                        project.description!,
-                        style: TextStyle(
+                        project.description,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
                           fontSize: 13,
-                          color: Colors.grey.shade600,
                         ),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
                       ),
                     ],
-
-                    SizedBox(height: 8),
-
-                    // Nombre de tâches
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.task_alt,
-                          size: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '$taskCount tâche${taskCount > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 6),
+                    Text(
+                      '$taskCount tâche${taskCount > 1 ? 's' : ''}',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
 
               // Menu contextuel (modifier / supprimer)
-              PopupMenuButton<String>(
-                // Les options du menu
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18, color: Colors.blue),
-                        SizedBox(width: 8),
-                        Text('Modifier'),
-                      ],
+              if (onEdit != null || onDelete != null)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit?.call();
+                    if (value == 'delete') onDelete?.call();
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Modifier')),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Supprimer', style: TextStyle(color: AppColors.error)),
                     ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Supprimer',
-                            style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-                // Action selon le choix
-                onSelected: (value) {
-                  if (value == 'edit') onEdit?.call();
-                  if (value == 'delete') onDelete?.call();
-                },
-              ),
+                  ],
+                ),
             ],
           ),
         ),

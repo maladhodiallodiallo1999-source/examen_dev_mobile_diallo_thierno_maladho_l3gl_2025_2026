@@ -1,43 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:sunu_task/services/storage_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
-/// Gère l'état global de l'application (initialisation, onboarding)
+/// Gère l'état global de l'application (onboarding, initialisation)
 class AppProvider extends ChangeNotifier {
-
-  // ======== Propriétés privées =========
   bool _isOnboardingComplete = false;
   bool _isInitialized = false;
   bool _isLoading = false;
 
-  // ======== Getters publics =========
   bool get isOnboardingComplete => _isOnboardingComplete;
   bool get isInitialized => _isInitialized;
   bool get isLoading => _isLoading;
 
-  // ======== Méthodes =========
-
-  /// Charge l'état depuis le StorageService
+  /// Charge l'état depuis le stockage au démarrage
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
 
     _isOnboardingComplete = StorageService.instance.isOnboardingComplete;
-    _isInitialized = true;
 
     _isLoading = false;
+    _isInitialized = true;
     notifyListeners();
   }
 
   /// Marque l'onboarding comme terminé
   Future<void> completeOnboarding() async {
-    await StorageService.instance.setOnboardingComplete(true);
+    await StorageService.instance.setOnboardingComplete();
     _isOnboardingComplete = true;
     notifyListeners();
   }
 
   /// Réinitialise l'onboarding (pour les tests)
   Future<void> resetOnboarding() async {
-    await StorageService.instance.setOnboardingComplete(false);
+    await StorageService.instance.resetOnboarding();
     _isOnboardingComplete = false;
     notifyListeners();
   }

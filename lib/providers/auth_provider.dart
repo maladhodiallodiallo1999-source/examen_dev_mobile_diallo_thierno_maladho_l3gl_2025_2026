@@ -1,57 +1,51 @@
-import 'package:flutter/material.dart';
-import 'package:sunu_task/models/User.dart';
-import 'package:sunu_task/services/storage_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:SunuTask/models/User.dart';
+import 'package:SunuTask/services/storage_service.dart';
 
 /// Gère l'authentification et la session utilisateur
 class AuthProvider extends ChangeNotifier {
-
-  // ======== Propriétés privées =========
   User? _currentUser;
   bool _isLoading = false;
   String? _error;
 
-  // ======== Getters publics =========
   User? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // ======== Méthodes =========
-
   /// Charge l'utilisateur connecté depuis le stockage
   Future<void> init() async {
-    _currentUser = StorageService.instance.getCurrentUser();
+    _currentUser = await StorageService.instance.getCurrentUser();
     notifyListeners();
   }
 
-  /// Connexion
+  /// Connexion avec email + mot de passe
   Future<bool> login(String email, String password) async {
-    // 1. Démarrer le chargement
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // 2. Récupérer tous les utilisateurs
-      final List<User> users = StorageService.instance.getUsers();
+      final users = await StorageService.instance.getUsers();
 
-      // 3. Chercher l'utilisateur avec cet email et mot de passe
-      final User? user = users.firstWhere(
-            (u) => u.email == email && u.password == password,
-        orElse: () => throw Exception('Email ou mot de passe incorrect'),
-      );
+      // Cherche l'utilisateur avec ces identifiants
+      final matches = users.where(
+        (u) => u.email == email && u.password == password,
+      ).toList();
 
-      // 4. Sauvegarder l'utilisateur connecté
-      await StorageService.instance.saveCurrentUser(user!);
+      if (matches.isEmpty) {
+        throw Exception('Email ou mot de passe incorrect');
+      }
+
+      final user = matches.first;
+      await StorageService.instance.saveCurrentUser(user);
       _currentUser = user;
-
       _isLoading = false;
       notifyListeners();
       return true;
 
     } catch (e) {
-      // 5. Erreur
       _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
@@ -59,36 +53,32 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Inscription
+  /// Inscription : crée un nouvel utilisateur
   Future<bool> register(String name, String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // 1. Vérifier si l'email existe déjà
-      final List<User> users = StorageService.instance.getUsers();
-      final bool emailExists = users.any((u) => u.email == email);
+      final users = await StorageService.instance.getUsers();
 
+      // Vérifie si l'email est déjà utilisé
+      final emailExists = users.any((u) => u.email == email);
       if (emailExists) {
         throw Exception('Un compte existe déjà avec cet email');
       }
 
-      // 2. Créer le nouvel utilisateur avec un ID unique
-      final User newUser = User(
+      // Crée le nouvel utilisateur
+      final newUser = User(
         id: const Uuid().v4(),
         name: name,
         email: email,
         password: password,
       );
 
-      // 3. Sauvegarder l'utilisateur
       await StorageService.instance.saveUser(newUser);
-
-      // 4. Connecter automatiquement
       await StorageService.instance.saveCurrentUser(newUser);
       _currentUser = newUser;
-
       _isLoading = false;
       notifyListeners();
       return true;
@@ -105,21 +95,19 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await StorageService.instance.clearCurrentUser();
     _currentUser = null;
-    _error = null;
     notifyListeners();
   }
 
-  /// Mise à jour du profil
+  /// Met à jour le profil utilisateur
   Future<void> updateProfile({String? name, String? email}) async {
     if (_currentUser == null) return;
-
-    final User updatedUser = _currentUser!.copyWith(
-      name: name,
-      email: email,
+    final updated = _currentUser!.copyWith(
+      name: name ?? _currentUser!.name,
+      email: email ?? _currentUser!.email,
     );
-
-    await StorageService.instance.saveCurrentUser(updatedUser);
-    _currentUser = updatedUser;
+    await StorageService.instance.saveCurrentUser(updated);
+    await StorageService.instance.saveUser(updated);
+    _currentUser = updated;
     notifyListeners();
   }
 

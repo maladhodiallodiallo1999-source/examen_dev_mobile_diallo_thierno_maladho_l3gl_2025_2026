@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sunu_task/models/project.dart';
-import 'package:sunu_task/models/task.dart';
-import 'package:sunu_task/models/User.dart';
+import 'package:SunuTask/models/User.dart';
+import 'package:SunuTask/models/project.dart';
+import 'package:SunuTask/models/task.dart';
 
-/// Service de stockage local avec pattern Singleton
 class StorageService {
-
-  //===== Singleton ==========
   static StorageService? _instance;
 
   static StorageService get instance {
@@ -17,7 +14,6 @@ class StorageService {
 
   StorageService._();
 
-  //===== SharedPreferences ==========
   late SharedPreferences _prefs;
   bool _initialized = false;
 
@@ -27,174 +23,104 @@ class StorageService {
     _initialized = true;
   }
 
-  // ======== Clés de Stockage =========
   static const String _keyOnboardingComplete = 'onboarding_complete';
   static const String _keyCurrentUser = 'current_user';
   static const String _keyUsers = 'users';
   static const String _keyProjects = 'projects';
   static const String _keyTasks = 'tasks';
 
-  // ======== Onboarding =========
+  // ONBOARDING
   bool get isOnboardingComplete {
     return _prefs.getBool(_keyOnboardingComplete) ?? false;
   }
-
-  Future<void> setOnboardingComplete(bool value) async {
-    await _prefs.setBool(_keyOnboardingComplete, value);
+  Future<void> setOnboardingComplete() async {
+    await _prefs.setBool(_keyOnboardingComplete, true);
+  }
+  Future<void> resetOnboarding() async {
+    await _prefs.remove(_keyOnboardingComplete);
   }
 
-  // ======== Utilisateur Connecté =========
-  /// Sauvegarder l'utilisateur connecté
+  // UTILISATEURS
+  Future<List<User>> getUsers() async {
+    final String? usersJson = _prefs.getString(_keyUsers);
+    if (usersJson == null) return [];
+    final List<dynamic> list = jsonDecode(usersJson);
+    return list.map((u) => User.fromMap(u as Map<String, dynamic>)).toList();
+  }
+  Future<void> saveUser(User user) async {
+    final users = await getUsers();
+    final index = users.indexWhere((u) => u.id == user.id);
+    if (index != -1) { users[index] = user; } else { users.add(user); }
+    await _prefs.setString(_keyUsers, jsonEncode(users.map((u) => u.toMap()).toList()));
+  }
   Future<void> saveCurrentUser(User user) async {
-    final String userJson = jsonEncode(user.toMap());
-    await _prefs.setString(_keyCurrentUser, userJson);
+    await _prefs.setString(_keyCurrentUser, jsonEncode(user.toMap()));
   }
-
-  /// Récupérer l'utilisateur connecté
-  User? getCurrentUser() {
+  Future<User?> getCurrentUser() async {
     final String? userJson = _prefs.getString(_keyCurrentUser);
     if (userJson == null) return null;
-    return User.fromMap(jsonDecode(userJson));
+    return User.fromMap(jsonDecode(userJson) as Map<String, dynamic>);
   }
-
-  /// Supprimer l'utilisateur connecté (déconnexion)
   Future<void> clearCurrentUser() async {
     await _prefs.remove(_keyCurrentUser);
   }
 
-  // ======== Utilisateurs =========
-  /// Récupérer tous les utilisateurs
-  List<User> getUsers() {
-    final List<String> usersJson =
-        _prefs.getStringList(_keyUsers) ?? [];
-    return usersJson
-        .map((json) => User.fromMap(jsonDecode(json)))
-        .toList();
+  // PROJETS
+  Future<List<Project>> getProjects() async {
+    final String? projectsJson = _prefs.getString(_keyProjects);
+    if (projectsJson == null) return [];
+    final List<dynamic> list = jsonDecode(projectsJson);
+    return list.map((p) => Project.fromMap(p as Map<String, dynamic>)).toList();
   }
-
-  /// Sauvegarder un nouvel utilisateur
-  Future<void> saveUser(User user) async {
-    final List<User> users = getUsers();
-    users.add(user);
-    final List<String> usersJson =
-    users.map((u) => jsonEncode(u.toMap())).toList();
-    await _prefs.setStringList(_keyUsers, usersJson);
+  Future<List<Project>> getProjectsByUserId(String userId) async {
+    final projects = await getProjects();
+    return projects.where((p) => p.userId == userId).toList();
   }
-
-  // ======== Projets =========
-  /// Récupérer tous les projets d'un utilisateur
-  List<Project> getProjects(String userId) {
-    final List<String> projectsJson =
-        _prefs.getStringList(_keyProjects) ?? [];
-    return projectsJson
-        .map((json) => Project.fromMap(jsonDecode(json)))
-        .where((project) => project.userId == userId)
-        .toList();
-  }
-
-  /// Sauvegarder un projet
   Future<void> saveProject(Project project) async {
-    final List<String> projectsJson =
-        _prefs.getStringList(_keyProjects) ?? [];
-    final List<Map<String, dynamic>> projects =
-    projectsJson.map((json) => jsonDecode(json) as Map<String, dynamic>).toList();
-
-    // Cherche si le projet existe déjà (mode modification)
-    final int index = projects.indexWhere((p) => p['id'] == project.id);
-
-    if (index >= 0) {
-      // Modification : remplace l'ancien
-      projects[index] = project.toMap();
-    } else {
-      // Création : ajoute le nouveau
-      projects.add(project.toMap());
-    }
-
-    final List<String> updatedJson =
-    projects.map((p) => jsonEncode(p)).toList();
-    await _prefs.setStringList(_keyProjects, updatedJson);
+    final projects = await getProjects();
+    final index = projects.indexWhere((p) => p.id == project.id);
+    if (index != -1) { projects[index] = project; } else { projects.add(project); }
+    await _prefs.setString(_keyProjects, jsonEncode(projects.map((p) => p.toMap()).toList()));
   }
-
-  /// Supprimer un projet
   Future<void> deleteProject(String projectId) async {
-    final List<String> projectsJson =
-        _prefs.getStringList(_keyProjects) ?? [];
-    final List<Map<String, dynamic>> projects =
-    projectsJson.map((json) => jsonDecode(json) as Map<String, dynamic>).toList();
-
-    projects.removeWhere((p) => p['id'] == projectId);
-
-    final List<String> updatedJson =
-    projects.map((p) => jsonEncode(p)).toList();
-    await _prefs.setStringList(_keyProjects, updatedJson);
+    final projects = await getProjects();
+    projects.removeWhere((p) => p.id == projectId);
+    await _prefs.setString(_keyProjects, jsonEncode(projects.map((p) => p.toMap()).toList()));
   }
 
-  // ======== Tâches =========
-  /// Récupérer toutes les tâches d'un projet
-  List<Task> getTasks(String projectId) {
-    final List<String> tasksJson =
-        _prefs.getStringList(_keyTasks) ?? [];
-    return tasksJson
-        .map((json) => Task.fromMap(jsonDecode(json)))
-        .where((task) => task.projectId == projectId)
-        .toList();
+  // TÂCHES
+  Future<List<Task>> getTasks() async {
+    final String? tasksJson = _prefs.getString(_keyTasks);
+    if (tasksJson == null) return [];
+    final List<dynamic> list = jsonDecode(tasksJson);
+    return list.map((t) => Task.fromMap(t as Map<String, dynamic>)).toList();
   }
-
-  /// Récupérer toutes les tâches d'un utilisateur
-  List<Task> getTasksByUser(String userId) {
-    final List<String> tasksJson =
-        _prefs.getStringList(_keyTasks) ?? [];
-    return tasksJson
-        .map((json) => Task.fromMap(jsonDecode(json)))
-        .where((task) => task.userId == userId)
-        .toList();
+  Future<List<Task>> getTasksByProjectId(String projectId) async {
+    final tasks = await getTasks();
+    return tasks.where((t) => t.projectId == projectId).toList();
   }
-
-  /// Sauvegarder une tâche
+  Future<List<Task>> getTasksByUserId(String userId) async {
+    final tasks = await getTasks();
+    return tasks.where((t) => t.userId == userId).toList();
+  }
   Future<void> saveTask(Task task) async {
-    final List<String> tasksJson =
-        _prefs.getStringList(_keyTasks) ?? [];
-    final List<Map<String, dynamic>> tasks =
-    tasksJson.map((json) => jsonDecode(json) as Map<String, dynamic>).toList();
-
-    final int index = tasks.indexWhere((t) => t['id'] == task.id);
-
-    if (index >= 0) {
-      tasks[index] = task.toMap();
-    } else {
-      tasks.add(task.toMap());
-    }
-
-    final List<String> updatedJson =
-    tasks.map((t) => jsonEncode(t)).toList();
-    await _prefs.setStringList(_keyTasks, updatedJson);
+    final tasks = await getTasks();
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    if (index != -1) { tasks[index] = task; } else { tasks.add(task); }
+    await _prefs.setString(_keyTasks, jsonEncode(tasks.map((t) => t.toMap()).toList()));
   }
-
-  /// Supprimer une tâche
   Future<void> deleteTask(String taskId) async {
-    final List<String> tasksJson =
-        _prefs.getStringList(_keyTasks) ?? [];
-    final List<Map<String, dynamic>> tasks =
-    tasksJson.map((json) => jsonDecode(json) as Map<String, dynamic>).toList();
-
-    tasks.removeWhere((t) => t['id'] == taskId);
-
-    final List<String> updatedJson =
-    tasks.map((t) => jsonEncode(t)).toList();
-    await _prefs.setStringList(_keyTasks, updatedJson);
+    final tasks = await getTasks();
+    tasks.removeWhere((t) => t.id == taskId);
+    await _prefs.setString(_keyTasks, jsonEncode(tasks.map((t) => t.toMap()).toList()));
+  }
+  Future<void> deleteTasksByProjectId(String projectId) async {
+    final tasks = await getTasks();
+    tasks.removeWhere((t) => t.projectId == projectId);
+    await _prefs.setString(_keyTasks, jsonEncode(tasks.map((t) => t.toMap()).toList()));
   }
 
-  /// Supprimer toutes les tâches d'un projet
-  Future<void> deleteTasksByProject(String projectId) async {
-    final List<String> tasksJson =
-        _prefs.getStringList(_keyTasks) ?? [];
-    final List<Map<String, dynamic>> tasks =
-    tasksJson.map((json) => jsonDecode(json) as Map<String, dynamic>).toList();
-
-    tasks.removeWhere((t) => t['projectId'] == projectId);
-
-    final List<String> updatedJson =
-    tasks.map((t) => jsonEncode(t)).toList();
-    await _prefs.setStringList(_keyTasks, updatedJson);
+  Future<void> clearAll() async {
+    await _prefs.clear();
   }
 }

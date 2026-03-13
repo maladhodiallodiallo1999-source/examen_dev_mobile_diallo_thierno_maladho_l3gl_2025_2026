@@ -26,8 +26,8 @@ class User {
     return User(
       id: id ?? this.id,
       name: name ?? this.name,
-      email: email ?? this.email,
-      password: password ?? this.password, //
+      email: email ?? this.email,       // ← bug corrigé
+      password: password ?? this.password, // ← bug corrigé
       avatar: avatar ?? this.avatar,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -40,7 +40,7 @@ class User {
       'email': email,
       'password': password,
       'avatar': avatar,
-      'createdAt': createdAt.toIso8601String(), //  String
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -50,13 +50,11 @@ class User {
       name: map['name'] as String,
       email: map['email'] as String,
       password: map['password'] as String,
-      avatar: map['avatar'] as String?, // nullable
+      avatar: map['avatar'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }
 
   @override
-  String toString() {
-    return 'User(id: $id, name: $name, email: $email)';
-  }
+  String toString() => 'User(id: $id, name: $name, email: $email)';
 }

@@ -1,155 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sunu_task/models/task.dart';
-import 'package:sunu_task/providers/task_provider.dart';
-import 'package:sunu_task/screens/tasks/task_detail_screen.dart';
-import 'package:sunu_task/widgets/cards/task_card.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/models/task.dart';
+import 'package:SunuTask/providers/auth_provider.dart';
+import 'package:SunuTask/providers/task_provider.dart';
+import 'package:SunuTask/widgets/cards/task_card.dart';
+import 'package:SunuTask/screens/tasks/task_detail_screen.dart';
 
-/// Onglet Tâches - Liste de toutes les tâches avec filtres
-class TasksTab extends StatelessWidget {
+class TasksTab extends StatefulWidget {
   const TasksTab({super.key});
+  @override
+  State<TasksTab> createState() => _TasksTabState();
+}
+
+class _TasksTabState extends State<TasksTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<AuthProvider>().currentUser;
+      if (user != null) context.read<TaskProvider>().loadAllTasks(user.id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final taskProvider = context.watch<TaskProvider>();
     final tasks = taskProvider.tasks;
 
-    return Column(
-      children: [
-        // Barre de filtres
-        _buildFilters(context, taskProvider),
-
-        // Liste des tâches
-        Expanded(
-          child: taskProvider.isLoading
-              ? Center(child: CircularProgressIndicator())
-              : tasks.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              return TaskCard(
-                task: task,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          TaskDetailScreen(task: task),
-                    ),
-                  );
-                },
-              );
-            },
+    return Column(children: [
+      // Barre de filtres
+      Container(
+        color: AppColors.surface,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(children: [
+          const Text('Filtre : ', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          const SizedBox(width: 8),
+          DropdownButton<TaskStatus?>(
+            value: null,
+            hint: const Text('Statut', style: TextStyle(fontSize: 13)),
+            underline: const SizedBox(),
+            items: const [
+              DropdownMenuItem(value: null, child: Text('Tous')),
+              DropdownMenuItem(value: TaskStatus.todo, child: Text('À faire')),
+              DropdownMenuItem(value: TaskStatus.inProgress, child: Text('En cours')),
+              DropdownMenuItem(value: TaskStatus.done, child: Text('Terminé')),
+            ],
+            onChanged: (v) => taskProvider.setStatusFilter(v),
           ),
-        ),
-      ],
-    );
-  }
-
-  /// Barre de filtres par statut
-  Widget _buildFilters(BuildContext context, TaskProvider taskProvider) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // Filtre Tous
-          _buildFilterChip(
-            context,
-            label: 'Tous',
-            isSelected: taskProvider.tasks.length ==
-                taskProvider.tasks.length,
-            onTap: () => taskProvider.clearFilters(),
+          const SizedBox(width: 12),
+          DropdownButton<TaskPriority?>(
+            value: null,
+            hint: const Text('Priorité', style: TextStyle(fontSize: 13)),
+            underline: const SizedBox(),
+            items: const [
+              DropdownMenuItem(value: null, child: Text('Toutes')),
+              DropdownMenuItem(value: TaskPriority.high, child: Text('Haute')),
+              DropdownMenuItem(value: TaskPriority.medium, child: Text('Moyenne')),
+              DropdownMenuItem(value: TaskPriority.low, child: Text('Basse')),
+            ],
+            onChanged: (v) => taskProvider.setPriorityFilter(v),
           ),
-          SizedBox(width: 8),
-          // Filtre À faire
-          _buildFilterChip(
-            context,
-            label: 'À faire',
-            isSelected: false,
-            color: Colors.orange,
-            onTap: () =>
-                taskProvider.setStatusFilter(TaskStatus.todo),
-          ),
-          SizedBox(width: 8),
-          // Filtre En cours
-          _buildFilterChip(
-            context,
-            label: 'En cours',
-            isSelected: false,
-            color: Colors.blue,
-            onTap: () =>
-                taskProvider.setStatusFilter(TaskStatus.inProgress),
-          ),
-          SizedBox(width: 8),
-          // Filtre Terminées
-          _buildFilterChip(
-            context,
-            label: 'Terminées',
-            isSelected: false,
-            color: Colors.green,
-            onTap: () =>
-                taskProvider.setStatusFilter(TaskStatus.done),
-          ),
-        ],
+        ]),
       ),
-    );
-  }
-
-  /// Chip de filtre réutilisable
-  Widget _buildFilterChip(
-      BuildContext context, {
-        required String label,
-        required bool isSelected,
-        Color? color,
-        required VoidCallback onTap,
-      }) {
-    final Color chipColor = color ?? Theme.of(context).primaryColor;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? chipColor : chipColor.withAlpha(20),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: chipColor.withAlpha(100)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : chipColor,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
+      Expanded(
+        child: tasks.isEmpty
+            ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.check_circle_outline, size: 80, color: AppColors.textDisable),
+                SizedBox(height: 16),
+                Text('Aucune tâche', style: TextStyle(fontSize: 18, color: AppColors.textSecondary)),
+              ]))
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: tasks.length,
+                itemBuilder: (context, i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TaskCard(
+                    task: tasks[i],
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TaskDetailScreen(task: tasks[i]))),
+                  ),
+                ),
+              ),
       ),
-    );
-  }
-
-  /// État vide
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.task, size: 80, color: Colors.grey.shade300),
-          SizedBox(height: 16),
-          Text(
-            'Aucune tâche pour l\'instant',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade500,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Créez un projet et ajoutez des tâches',
-            style: TextStyle(color: Colors.grey.shade400),
-          ),
-        ],
-      ),
-    );
+    ]);
   }
 }

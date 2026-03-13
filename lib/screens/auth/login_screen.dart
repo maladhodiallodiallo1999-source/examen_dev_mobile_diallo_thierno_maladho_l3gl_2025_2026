@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sunu_task/providers/auth_provider.dart';
-import 'package:sunu_task/screens/auth/register_screen.dart';
-import 'package:sunu_task/screens/home/home_screen.dart';
-import 'package:sunu_task/widgets/common/custom_button.dart';
-import 'package:sunu_task/widgets/common/custom_text_field.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
+import 'package:SunuTask/core/constants/app_strings.dart';
+import 'package:SunuTask/providers/auth_provider.dart';
+import 'package:SunuTask/widgets/common/custom_button.dart';
+import 'package:SunuTask/widgets/common/custom_text_field.dart';
+import 'package:SunuTask/screens/auth/register_screen.dart';
+import 'package:SunuTask/screens/home/home_screen.dart';
 
-/// Écran de connexion
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,14 +16,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Clé unique pour identifier et valider le formulaire
   final _formKey = GlobalKey<FormState>();
-
-  // Controllers pour lire les valeurs saisies
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // Libérer la mémoire quand l'écran se ferme
   @override
   void dispose() {
     _emailController.dispose();
@@ -30,174 +27,113 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// Fonction appelée quand on appuie sur "Se connecter"
-  Future<void> _login() async {
-    // 1. Valider le formulaire
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // 2. Récupérer le provider sans écouter les changements
-    final authProvider = context.read<AuthProvider>();
-
-    // 3. Appeler la fonction login
-    final bool success = await authProvider.login(
+    final auth = context.read<AuthProvider>();
+    final success = await auth.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
-    // 4. Si succès → naviguer vers HomeScreen
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
-            (route) => false, // Supprime tout l'historique de navigation
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.error ?? 'Erreur de connexion'),
+          backgroundColor: AppColors.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AuthProvider>().isLoading;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 40),
-
-                // Titre
-                Text(
-                  'Connexion',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 40),
+                // Icône
+                Center(
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.task_alt, size: 45, color: Colors.white),
                   ),
                 ),
-
-                SizedBox(height: 8),
-
-                Text(
-                  'Bienvenue ! Connectez-vous pour continuer.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                  ),
+                const SizedBox(height: 32),
+                const Text(
+                  'Bon retour ! 👋',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Connectez-vous à votre compte',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
+                ),
+                const SizedBox(height: 40),
 
-                SizedBox(height: 40),
-
-                // Champ Email
                 CustomTextField(
-                  label: 'Email',
-                  hint: 'exemple@email.com',
+                  label: AppStrings.email,
                   controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
                   prefixIcon: Icons.email_outlined,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer votre email';
-                    }
-                    if (!value.contains('@') || !value.contains('.')) {
-                      return 'Email invalide';
-                    }
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return AppStrings.emailRequired;
+                    if (!v.contains('@') || !v.contains('.')) return AppStrings.invalidEmail;
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
 
-                SizedBox(height: 16),
-
-                // Champ Mot de passe
                 CustomTextField(
-                  label: 'Mot de passe',
-                  hint: 'Minimum 6 caractères',
+                  label: AppStrings.password,
                   controller: _passwordController,
-                  obscureText: true,
                   prefixIcon: Icons.lock_outlined,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer votre mot de passe';
-                    }
-                    if (value.length < 6) {
-                      return 'Minimum 6 caractères';
-                    }
+                  obscureText: true,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return AppStrings.passwordRequired;
+                    if (v.length < 6) return AppStrings.passwordTooShort;
                     return null;
                   },
                 ),
+                const SizedBox(height: 32),
 
-                SizedBox(height: 24),
-
-                // Message d'erreur (si login échoue)
-                Consumer<AuthProvider>(
-                  builder: (context, auth, child) {
-                    if (auth.error != null) {
-                      return Container(
-                        padding: EdgeInsets.all(12),
-                        margin: EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline,
-                                color: Colors.red, size: 18),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                auth.error!,
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    return SizedBox();
-                  },
+                CustomButton(
+                  text: AppStrings.login,
+                  onPressed: isLoading ? null : _handleLogin,
+                  isLoading: isLoading,
                 ),
+                const SizedBox(height: 16),
 
-                // Bouton Se connecter
-                Consumer<AuthProvider>(
-                  builder: (context, auth, child) {
-                    return CustomButton(
-                      text: 'Se connecter',
-                      isLoading: auth.isLoading,
-                      onPressed: _login,
-                    );
-                  },
-                ),
-
-                SizedBox(height: 24),
-
-                // Lien vers l'inscription
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      // Efface l'erreur avant de naviguer
-                      context.read<AuthProvider>().clearError();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const RegisterScreen()),
-                      );
-                    },
-                    child: RichText(
-                      text: TextSpan(
-                        text: "Pas de compte ? ",
-                        style: TextStyle(color: Colors.grey.shade600),
-                        children: [
-                          TextSpan(
-                            text: "S'inscrire",
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
+                    child: Text(
+                      '${AppStrings.noAccount} ${AppStrings.register}',
+                      style: const TextStyle(color: AppColors.primary),
                     ),
                   ),
                 ),

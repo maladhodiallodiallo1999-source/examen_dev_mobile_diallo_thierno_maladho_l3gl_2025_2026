@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:SunuTask/core/constants/app_colors.dart';
 
-/// Bouton personnalisé réutilisable avec deux variantes
+/// Bouton personnalisé réutilisable avec deux variantes (plein / contour)
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -25,66 +26,53 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color buttonColor = color ?? Theme.of(context).primaryColor;
-
-    // Contenu du bouton (texte ou chargement)
-    Widget buttonChild = isLoading
-        ? SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(
-        strokeWidth: 2,
-        valueColor: AlwaysStoppedAnimation<Color>(
-          isOutlined ? buttonColor : Colors.white,
-        ),
-      ),
-    )
+    // Contenu : spinner ou texte+icône
+    Widget content = isLoading
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          )
         : Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 18),
-          SizedBox(width: 8),
-        ],
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18),
+                const SizedBox(width: 8),
+              ],
+              Text(text),
+            ],
+          );
+
+    if (isOutlined) {
+      return SizedBox(
+        width: width ?? double.infinity,
+        height: height ?? 50,
+        child: OutlinedButton(
+          onPressed: isLoading ? null : onPressed,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: color ?? AppColors.primary),
+            foregroundColor: color ?? AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          child: content,
         ),
-      ],
-    );
+      );
+    }
 
-    // Style commun
-    final ButtonStyle elevatedStyle = ElevatedButton.styleFrom(
-      backgroundColor: buttonColor,
-      foregroundColor: Colors.white,
-      minimumSize: Size(width ?? double.infinity, height ?? 50),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: width ?? double.infinity,
+      height: height ?? 50,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? AppColors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: content,
       ),
-    );
-
-    final ButtonStyle outlinedStyle = OutlinedButton.styleFrom(
-      foregroundColor: buttonColor,
-      minimumSize: Size(width ?? double.infinity, height ?? 50),
-      side: BorderSide(color: buttonColor, width: 1.5),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    );
-
-    return isOutlined
-        ? OutlinedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: outlinedStyle,
-      child: buttonChild,
-    )
-        : ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: elevatedStyle,
-      child: buttonChild,
     );
   }
 }
